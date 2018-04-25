@@ -1,0 +1,48 @@
+- hosts: all
+  remote_user: ansible
+  sudo: yes
+  tasks:
+    - name: yum update all
+      yum: name=* state=latest
+
+    - name: install PostgreSQL Yum Repository
+      yum: name=http://yum.postgresql.org/9.5/redhat/rhel-7-x86_64/pgdg-centos95                                                                             -9.5-2.noarch.rpm
+
+    - name: install PostgreSQL Server
+      yum: name={{ item }} state=latest
+      with_items:
+        - postgresql95-server
+        - postgresql95-devel
+        - postgresql95-contrib
+        - libselinux-python
+        - python-psycopg2
+
+#    - name: initdb
+#      shell: /usr/pgsql-9.5/bin/postgresql95-setup initdb
+
+    - name: start postgresql
+      service: name=postgresql-9.5 state=started
+
+    - name: change listen_addresses to '*'
+      lineinfile: dest=/var/lib/pgsql/9.5/data/postgresql.conf
+        regexp="^#listen_addresses"
+        line="listen_addresses = '*'"
+        state=present
+        backup=yes
+
+    - name: change pg_hba.conf
+      lineinfile: dest=/var/lib/pgsql/9.5/data/pg_hba.conf
+        regexp="host\s+all\s+all\s+127.0.0.1/32\s+ident"
+        line="host all all 0.0.0.0/0 trust"
+        insertbefore=BOF
+
+    - name: allow port 5432
+      shell: /sbin/iptables -A INPUT -p tcp --dport 5432 -j ACCEPT
+
+    - name: sysconfig iptables touch
+      file: path=/etc/sysconfig/iptables state=touch owner=root group=root mode=                                                                             0644
+
+    - name:
+      service: name=postgresql-9.5 state=stopped
+#    - name: iptables restart
+#      systemd: name=iptables state=restarted
